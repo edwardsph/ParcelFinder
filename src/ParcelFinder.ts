@@ -38,8 +38,8 @@ interface IGrid {
  */
 function parsePoints(points: string[]): IGrid {
   const parsedPoints: IPoint[] = [];
-  let maxX: number = -1;
-  let maxY: number = -1;
+  let maxX = -1;
+  let maxY = -1;
   points.forEach((point: string) => {
     // check each point is of the form "1,1" and are positive integers
     const coords: string[] = point.match(/^(\d+)\s*,\s*(\d+)$/);
@@ -104,7 +104,7 @@ function findParcels(gridData: IGrid): number[] {
  * @returns {number} Number of open edges for the parcel
  */
 function traceParcel(gridData: IGrid, pX: number, pY: number) {
-  let openEdges: number = 0;
+  let openEdges = 0;
   const seen: Set<string> = new Set();
   const hasNotBeenSeen = (x: number, y: number) => !seen.has([x, y].join(' '));
   const isNewNeighbour = (x: number, y: number) => gridData.grid[x][y] && hasNotBeenSeen(x, y);
