@@ -9,10 +9,11 @@ finds and returns a list of the perimeter values.
 - npm
 
 ## Installation instructions
-Use the node package manager to install all dependencies.
+Use the node package manager to install all dependencies and then build the package.
 
 ```
 npm install
+npm run build
 ```
 
 ## Command line usage
