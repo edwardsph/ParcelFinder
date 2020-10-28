@@ -80,7 +80,15 @@ function findParcels(grid, maxX, maxY) {
 }
 
 /**
- * Trace a parcel by looking for connected points, counting open edges as it goes
+ * Trace a parcel by looking for connected points, counting open edges as it goes based on a Depth First Search algorithm.
+ * It uses a stack to build a list of connected points that need evaluating.
+ * It also uses a Set to keep track of points that have already been evaluated to avoid cycling over the same points.
+ * The input point is added to the stack first, then while the stack is not empty, the loop pops points off the stack to
+ * be evaluated.
+ *   The point's value is set to 0 in the grid so that it is not evaluated again and not used as a starting point to trace another parcel.
+ *   If the point has not been seen before, we look at any possible neighbouring cells in the grid
+ *    - if they are defined as points and have not been visited before it adds them to the stack for later evaluation
+ *    - otherwise, if the cell was not seen before, add to the count of open edges
  * @param grid Populated 2D grid containing points
  * @param x X coordinate of first point in the parcel
  * @param y Y coordinate of first point in the parcel
@@ -90,16 +98,20 @@ function findParcels(grid, maxX, maxY) {
  */
 function traceParcel(grid, x, y, maxX, maxY) {
   let openEdges = 0;
+  // create a stack of points to be examined
+  const stack = [[x,y]];
+  // create a set to contain a list of visited points
   const seen = new Set();
   const hasBeenSeen = (x, y) => seen.has([x, y].join(' '));
   const isNewNeighbour = (x, y) => grid[x][y] && !hasBeenSeen(x, y);
-  // create a stack of points to be examined
-  const stack = [[x,y]];
   while (stack.length) {
     const p = stack.pop();
     // unset this point so it is not evaluated again
     grid[p[0]][p[1]] = 0;
     if (!hasBeenSeen(p[0], p[1])) {
+      // look at any possible neighbouring cells - if they contain a previously unseen point add them to the stack
+      // otherwise, if the neighbouring cell was not seen before increment the count of open edges
+
       // look left if not in first column
       if (p[0] > 0 && isNewNeighbour(p[0] - 1, p[1])) {
         stack.push([p[0] - 1, p[1]]);
