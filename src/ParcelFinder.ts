@@ -5,19 +5,30 @@ const MAX_VALUE = 99;
 /**
  * ParcelFinder
  */
-module.exports = {
+export class ParcelFinder {
   /**
-   * Given a set of points, render a list of perimeters for any parcels this defines
+   * Given a set of points, compute a list of perimeters for any parcels this defines
    * @param points Array of strings containing x,y coordinates e.g. "0,0"
    * @returns {*[]} Array of numbers representing the perimeter count for each parcel found
    */
-  render(points) {
+  computeParcelPerimeters(points: string[]): number[] {
     if (!points || !points.length) {
       return [];
     }
-    const {grid, maxX, maxY} = parsePoints(points);
-    return findParcels(grid, maxX, maxY);
+    const gridData: IGrid = parsePoints(points);
+    return findParcels(gridData);
   }
+}
+
+interface IPoint {
+  x:number
+  y:number
+}
+
+interface IGrid {
+  grid: number[][],
+  maxX: number,
+  maxY: number
 }
 
 /**
@@ -25,36 +36,32 @@ module.exports = {
  * @param points Array of strings containing x,y coordinates e.g. "0,0"
  * @returns {{grid: *[], maxY: number, maxX: number}} Populated 2D grid containing points and the size limits of the axes
  */
-function parsePoints(points) {
-  const parsedPoints = [];
-  let maxX = -1;
-  let maxY = -1;
-  if (!Array.isArray(points)) {
-    throw new TypeError(TYPE_ERROR_MSG);
-  }
-  points.forEach((point) => {
+function parsePoints(points: string[]): IGrid {
+  const parsedPoints: IPoint[] = [];
+  let maxX: number = -1;
+  let maxY: number = -1;
+  points.forEach((point: string) => {
     // check each point is of the form "1,1" and are positive integers
-    if (typeof point !== 'string') {
-      throw new TypeError(TYPE_ERROR_MSG);
-    }
-    const coords = point.match(/^(\d+)\s*,\s*(\d+)$/);
+    const coords: string[] = point.match(/^(\d+)\s*,\s*(\d+)$/);
     if (!coords || coords.length !== 3) {
       throw new TypeError(TYPE_ERROR_MSG);
     }
     // check the points are within range
-    const x = parseInt(coords[1], 10);
-    const y = parseInt(coords[2], 10);
-    if (x > MAX_VALUE || y > MAX_VALUE) {
+    const gridPoint: IPoint = {
+      x: parseInt(coords[1], 10),
+      y: parseInt(coords[2], 10)
+    };
+    if (gridPoint.x > MAX_VALUE || gridPoint.y > MAX_VALUE) {
       throw new RangeError(RANGE_ERROR_MSG);
     }
-    parsedPoints.push([x, y]);
-    maxX = Math.max(maxX, x);
-    maxY = Math.max(maxY, y);
+    parsedPoints.push(gridPoint);
+    maxX = Math.max(maxX, gridPoint.x);
+    maxY = Math.max(maxY, gridPoint.y);
   });
   // set up the empty grid of the correct size and populate it with the points provided
   const grid = createEmptyGrid(maxX, maxY);
   parsedPoints.forEach((point) => {
-    grid[point[0]][point[1]] = 1;
+    grid[point.x][point.y] = 1;
   })
   return {grid, maxX, maxY};
 }
@@ -66,13 +73,13 @@ function parsePoints(points) {
  * @param maxY Limit of y axis
  * @returns {[]} Array of numbers representing the perimeter count for each parcel found
  */
-function findParcels(grid, maxX, maxY) {
+function findParcels(gridData: IGrid): number[] {
   const perimeters = [];
-  for (let x=0; x<=maxX; x++) {
-    for (let y=0; y<=maxY; y++) {
-      if (grid[x][y]) {
+  for (let x=0; x<=gridData.maxX; x++) {
+    for (let y=0; y<=gridData.maxY; y++) {
+      if (gridData.grid[x][y]) {
         // trace a new parcel
-        perimeters.push(traceParcel(grid, x, y, maxX, maxY))
+        perimeters.push(traceParcel(gridData, x, y))
       }
     }
   }
@@ -84,60 +91,56 @@ function findParcels(grid, maxX, maxY) {
  * It uses a stack to build a list of connected points that need evaluating.
  * It also uses a Set to keep track of points that have already been evaluated to avoid cycling over the same points.
  * The input point is added to the stack first, then while the stack is not empty, the loop pops points off the stack to
- * be evaluated.
+ * be evaluated as follows:
  *   The point's value is set to 0 in the grid so that it is not evaluated again and not used as a starting point to trace another parcel.
  *   If the point has not been seen before, we look at any possible neighbouring cells in the grid
  *    - if they are defined as points and have not been visited before it adds them to the stack for later evaluation
  *    - otherwise, if the cell was not seen before, add to the count of open edges
  * @param grid Populated 2D grid containing points
- * @param x X coordinate of first point in the parcel
- * @param y Y coordinate of first point in the parcel
+ * @param pX X coordinate of first point in the parcel
+ * @param pY Y coordinate of first point in the parcel
  * @param maxX Limit of x axis
  * @param maxY Limit of y axis
  * @returns {number} Number of open edges for the parcel
  */
-function traceParcel(grid, x, y, maxX, maxY) {
-  let openEdges = 0;
+function traceParcel(gridData: IGrid, pX: number, pY: number) {
+  let openEdges: number = 0;
+  const seen: Set<string> = new Set();
+  const hasNotBeenSeen = (x: number, y: number) => !seen.has([x, y].join(' '));
+  const isNewNeighbour = (x: number, y: number) => gridData.grid[x][y] && hasNotBeenSeen(x, y);
   // create a stack of points to be examined
-  const stack = [[x,y]];
-  // create a set to contain a list of visited points
-  const seen = new Set();
-  const hasBeenSeen = (x, y) => seen.has([x, y].join(' '));
-  const isNewNeighbour = (x, y) => grid[x][y] && !hasBeenSeen(x, y);
+  const stack: IPoint[] = [{x:pX, y:pY}];
   while (stack.length) {
-    const p = stack.pop();
+    const evaluatedPoint: IPoint = stack.pop();
     // unset this point so it is not evaluated again
-    grid[p[0]][p[1]] = 0;
-    if (!hasBeenSeen(p[0], p[1])) {
-      // look at any possible neighbouring cells - if they contain a previously unseen point add them to the stack
-      // otherwise, if the neighbouring cell was not seen before increment the count of open edges
-
+    gridData.grid[evaluatedPoint.x][evaluatedPoint.y] = 0;
+    if (hasNotBeenSeen(evaluatedPoint.x, evaluatedPoint.y)) {
       // look left if not in first column
-      if (p[0] > 0 && isNewNeighbour(p[0] - 1, p[1])) {
-        stack.push([p[0] - 1, p[1]]);
-      } else if (!hasBeenSeen(p[0] - 1, p[1])) {
+      if (evaluatedPoint.x > 0 && isNewNeighbour(evaluatedPoint.x - 1, evaluatedPoint.y)) {
+        stack.push({x:evaluatedPoint.x - 1, y:evaluatedPoint.y});
+      } else if (hasNotBeenSeen(evaluatedPoint.x - 1, evaluatedPoint.y)) {
         openEdges++;
       }
       // look right if not in last column
-      if (p[0] < maxX && isNewNeighbour(p[0] + 1, p[1])) {
-        stack.push([p[0] + 1, p[1]]);
-      } else if (!hasBeenSeen(p[0] + 1, p[1])) {
+      if (evaluatedPoint.x < gridData.maxX && isNewNeighbour(evaluatedPoint.x + 1, evaluatedPoint.y)) {
+        stack.push({x:evaluatedPoint.x + 1, y:evaluatedPoint.y});
+      } else if (hasNotBeenSeen(evaluatedPoint.x + 1, evaluatedPoint.y)) {
         openEdges++;
       }
       // look down if not in bottom row
-      if (p[1] > 0 && isNewNeighbour(p[0], p[1] - 1)) {
-        stack.push([p[0], p[1] - 1]);
-      } else if (!hasBeenSeen(p[0], p[1] - 1)) {
+      if (evaluatedPoint.y > 0 && isNewNeighbour(evaluatedPoint.x, evaluatedPoint.y - 1)) {
+        stack.push({x:evaluatedPoint.x, y:evaluatedPoint.y - 1});
+      } else if (hasNotBeenSeen(evaluatedPoint.x, evaluatedPoint.y - 1)) {
         openEdges++;
       }
       // look up if not in top row
-      if (p[1] < maxY && isNewNeighbour(p[0], p[1] + 1)) {
-        stack.push([p[0], p[1] + 1]);
-      } else if (!hasBeenSeen(p[0], p[1] + 1)) {
+      if (evaluatedPoint.y < gridData.maxY && isNewNeighbour(evaluatedPoint.x, evaluatedPoint.y + 1)) {
+        stack.push({x:evaluatedPoint.x, y:evaluatedPoint.y + 1});
+      } else if (hasNotBeenSeen(evaluatedPoint.x, evaluatedPoint.y + 1)) {
         openEdges++;
       }
-      // mark point as seen
-      seen.add([p[0], p[1]].join(' '));
+      // mark point as seen (concat coords for lookup as a string)
+      seen.add([evaluatedPoint.x, evaluatedPoint.y].join(' '));
     }
   }
   return openEdges;
@@ -149,8 +152,8 @@ function traceParcel(grid, x, y, maxX, maxY) {
  * @param y Limit of y axis
  * @returns {any[]} A 2D grid of points set to 0
  */
-function createEmptyGrid(x, y) {
-  const grid = Array(x + 1);
+function createEmptyGrid(x: number, y: number): number[][] {
+  const grid: number[][] = Array(x + 1);
   for (let i=0; i<=x; i++) {
     grid[i] = Array(y + 1).fill(0);
   }
