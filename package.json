@@ -4,7 +4,7 @@
   "description": "Find parcels of land in a grid",
   "main": "dist/main.js",
   "scripts": {
-    "test": "nyc mocha ./test/*.ts",
+    "test": "nyc --reporter=lcov mocha ./test/*.ts",
     "start": "tsc && node dist/src/main.js",
     "lint": "eslint src/**/*.ts",
     "build": "tsc"
